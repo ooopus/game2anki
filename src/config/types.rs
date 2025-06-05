@@ -1,6 +1,7 @@
 use super::key_parse::keys_from_str_de;
 use rdev::Key;
 use serde::{Deserialize, Serialize};
+use std::fmt;
 use strum_macros::EnumString;
 #[derive(Debug, Deserialize, Serialize)]
 pub struct Config {
@@ -63,7 +64,7 @@ pub struct Anki {
 }
 
 #[derive(Clone, Debug, Deserialize, EnumString, Serialize)]
-#[strum(serialize_all = "snake_case")]
+#[strum(serialize_all = "lowercase")]
 pub enum AudioFormat {
     #[serde(rename = "opus")]
     Opus, // ogg Opus
@@ -72,7 +73,7 @@ pub enum AudioFormat {
 }
 
 #[derive(Clone, Debug, Deserialize, Serialize, EnumString)]
-#[strum(serialize_all = "snake_case")]
+#[strum(serialize_all = "lowercase")]
 pub enum ScreenshotFormat {
     #[serde(rename = "avif")]
     Avif,
@@ -86,4 +87,23 @@ pub enum ScreenshotFormat {
 pub enum FileFormat {
     AudioFormat(AudioFormat),
     ScreenshotFormat(ScreenshotFormat),
+}
+
+impl fmt::Display for AudioFormat {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            AudioFormat::Opus => write!(f, "opus"),
+            AudioFormat::Mp3 => write!(f, "mp3"),
+        }
+    }
+}
+
+impl fmt::Display for ScreenshotFormat {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            ScreenshotFormat::Avif => write!(f, "avif"),
+            ScreenshotFormat::Webp => write!(f, "webp"),
+            ScreenshotFormat::Png => write!(f, "png"),
+        }
+    }
 }

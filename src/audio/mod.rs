@@ -1,5 +1,4 @@
-use crate::config::AudioFormat;
-use crate::{anki::AnkiClient, config::AudioRecord};
+use crate::{anki::AnkiClient, config::AudioRecord, utils::file::generate_safe_filename};
 
 use log::{debug, error, info};
 
@@ -11,9 +10,7 @@ use std::fs;
 use std::path::PathBuf;
 use std::sync::{Arc, Mutex};
 use std::thread;
-use std::time::{SystemTime, UNIX_EPOCH};
 use wasapi::{Direction, SampleType, StreamMode, WaveFormat, get_default_device, initialize_mta};
-use windows_capture::window::Window;
 type Res<T> = Result<T, Box<dyn error::Error>>;
 
 #[derive(Clone)]
@@ -195,9 +192,7 @@ impl AudioRecorder {
             self.cfg.sample_rate,
             self.channels,
         )?;
-        let filename = self
-            .generate_filename(&self.cfg.field_name, self.cfg.format.clone())
-            .await;
+        let filename = generate_safe_filename(&self.cfg.field_name, &self.cfg.format.to_string());
         // 保存到Anki
         self.save_to_anki(_data, &filename).await?;
         info!("Recording saved as: {}", filename);
@@ -226,23 +221,6 @@ impl AudioRecorder {
         Ok(())
     }
 
-    pub async fn generate_filename(&self, prefix: &str, ext: AudioFormat) -> String {
-        let window_name = Self::get_foreground_window_name();
-        let timestamp = SystemTime::now()
-            .duration_since(UNIX_EPOCH)
-            .unwrap()
-            .as_secs();
-        // 过滤掉非法字符
-        let safe_window_name: String = window_name
-            .chars()
-            .map(|c| if r#"/\?%*:|"<>."#.contains(c) { '_' } else { c })
-            .collect();
-        format!("{}_{}_{}.{:?}", prefix, safe_window_name, timestamp, ext)
-    }
-    pub fn get_foreground_window_name() -> String {
-        let window = Window::foreground().unwrap();
-        window.title().unwrap().to_string()
-    }
     fn trim_silence(samples: &[f32], threshold: f32) -> &[f32] {
         let start = samples
             .iter()

@@ -3,6 +3,7 @@ mod audio;
 mod config;
 mod hotkey_manager;
 mod screenshot;
+mod utils;
 use std::sync::Arc;
 
 use anki::AnkiClient;
@@ -17,7 +18,7 @@ async fn main() -> Result<()> {
     let cfg = Arc::new(config::load_user_config()?);
     let anki = Arc::new(AnkiClient::new(&cfg.anki));
 
-    // 类似的截图热键设置
+    hotkey_manager::HotKeyManager::init();
     setup_screenshot_hotkey(cfg.clone(), anki.clone());
     setup_audio_record_hotkey(cfg.clone(), anki.clone());
 

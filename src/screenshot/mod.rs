@@ -1,15 +1,12 @@
-use crate::config::ScreenshotFormat;
 use crate::screenshot::capture::capture_active_window;
 use crate::{anki::AnkiClient, config::Screenshot};
 use anyhow::Result;
 use log::{debug, info};
 use std::sync::Arc;
-use std::time::{SystemTime, UNIX_EPOCH};
-use windows_capture::window::Window;
 mod capture;
 mod encode;
+use crate::utils::file::generate_safe_filename;
 use encode::encode;
-
 impl Default for Screenshot {
     fn default() -> Self {
         Self {
@@ -34,9 +31,8 @@ impl AnkiScreenshot {
 
     /// 外部调用的热键处理函数
     pub async fn on_hotkey_clicked(&self) -> Result<()> {
-        let filename = self
-            .generate_filename(&self.cfg.field_name, self.cfg.format.clone())
-            .await;
+        let filename = generate_safe_filename(&self.cfg.field_name, &self.cfg.format.to_string());
+
         let screenshot = capture_active_window(self.cfg.clone())?;
 
         let _data = encode(
@@ -66,21 +62,5 @@ impl AnkiScreenshot {
 
         info!("截图已成功保存到Anki卡片 ID: {}", note_id);
         Ok(())
-    }
-    pub async fn generate_filename(&self, prefix: &str, ext: ScreenshotFormat) -> String {
-        let window_name = Self::get_foreground_window_name();
-        let timestamp = SystemTime::now()
-            .duration_since(UNIX_EPOCH)
-            .unwrap()
-            .as_secs();
-        let safe_window_name: String = window_name
-            .chars()
-            .map(|c| if r#"/\?%*:|"<>."#.contains(c) { '_' } else { c })
-            .collect();
-        format!("{}_{}_{}.{:?}", prefix, safe_window_name, timestamp, ext)
-    }
-    pub fn get_foreground_window_name() -> String {
-        let window = Window::foreground().unwrap();
-        window.title().unwrap().to_string()
     }
 }
