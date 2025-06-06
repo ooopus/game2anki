@@ -2,7 +2,6 @@ use super::key_parse::keys_from_str_de;
 use rdev::Key;
 use serde::{Deserialize, Serialize};
 use std::fmt;
-use strum_macros::EnumString;
 #[derive(Debug, Deserialize, Serialize)]
 pub struct Config {
     #[serde(rename = "hotKey")]
@@ -16,6 +15,21 @@ pub struct Config {
 
     #[serde(rename = "anki")]
     pub anki: Anki,
+
+    #[serde(rename = "logLevel")]
+    pub log_level: LogLevel,
+}
+
+impl Default for Config {
+    fn default() -> Self {
+        Self {
+            hot_key: HotKey::default(),
+            screen_shot: Screenshot::default(),
+            audio_record: AudioRecord::default(),
+            anki: Anki::default(),
+            log_level: LogLevel::default(),
+        }
+    }
 }
 
 #[derive(Debug, Deserialize, Serialize)]
@@ -25,6 +39,15 @@ pub struct HotKey {
 
     #[serde(rename = "audioRecord", deserialize_with = "keys_from_str_de")]
     pub audio_record: Vec<Key>,
+}
+
+impl Default for HotKey {
+    fn default() -> Self {
+        Self {
+            screen_shot: vec![Key::CapsLock],
+            audio_record: vec![Key::Tab],
+        }
+    }
 }
 
 #[derive(Clone, Debug, Deserialize, Serialize)]
@@ -45,6 +68,18 @@ pub struct Screenshot {
     pub exclude_title_bar: bool,
 }
 
+impl Default for Screenshot {
+    fn default() -> Self {
+        Self {
+            format: ScreenshotFormat::Avif,
+            field_name: "Picture".to_string(),
+            quality: 60,
+            speed: 6,
+            exclude_title_bar: true,
+        }
+    }
+}
+
 #[derive(Clone, Debug, Deserialize, Serialize)]
 pub struct AudioRecord {
     #[serde(rename = "format")]
@@ -57,14 +92,31 @@ pub struct AudioRecord {
     pub sample_rate: u32,
 }
 
+impl Default for AudioRecord {
+    fn default() -> Self {
+        Self {
+            format: AudioFormat::Opus,
+            field_name: "SentenceAudio".to_string(),
+            sample_rate: 48000,
+        }
+    }
+}
+
 #[derive(Debug, Deserialize, Serialize)]
 pub struct Anki {
     #[serde(rename = "ankiConnectUrl")]
     pub anki_connect_url: String,
 }
 
-#[derive(Clone, Debug, Deserialize, EnumString, Serialize)]
-#[strum(serialize_all = "lowercase")]
+impl Default for Anki {
+    fn default() -> Self {
+        Self {
+            anki_connect_url: "http://127.0.0.1:8765".to_string(),
+        }
+    }
+}
+
+#[derive(Clone, Debug, Deserialize, Serialize)]
 pub enum AudioFormat {
     #[serde(rename = "opus")]
     Opus, // ogg Opus
@@ -72,8 +124,7 @@ pub enum AudioFormat {
     Mp3,
 }
 
-#[derive(Clone, Debug, Deserialize, Serialize, EnumString)]
-#[strum(serialize_all = "lowercase")]
+#[derive(Clone, Debug, Deserialize, Serialize)]
 pub enum ScreenshotFormat {
     #[serde(rename = "avif")]
     Avif,
@@ -104,6 +155,38 @@ impl fmt::Display for ScreenshotFormat {
             ScreenshotFormat::Avif => write!(f, "avif"),
             ScreenshotFormat::Webp => write!(f, "webp"),
             ScreenshotFormat::Png => write!(f, "png"),
+        }
+    }
+}
+
+#[derive(Clone, Debug, Deserialize, Serialize)]
+pub enum LogLevel {
+    #[serde(rename = "trace")]
+    Trace,
+    #[serde(rename = "debug")]
+    Debug,
+    #[serde(rename = "info")]
+    Info,
+    #[serde(rename = "warn")]
+    Warn,
+    #[serde(rename = "error")]
+    Error,
+}
+
+impl Default for LogLevel {
+    fn default() -> Self {
+        Self::Info
+    }
+}
+
+impl fmt::Display for LogLevel {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            LogLevel::Trace => write!(f, "trace"),
+            LogLevel::Debug => write!(f, "debug"),
+            LogLevel::Info => write!(f, "info"),
+            LogLevel::Warn => write!(f, "warn"),
+            LogLevel::Error => write!(f, "error"),
         }
     }
 }

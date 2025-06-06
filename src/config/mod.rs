@@ -1,5 +1,4 @@
 use anyhow::{Context, Result};
-use rdev::Key;
 use std::fs;
 use std::path::PathBuf;
 pub mod key_parse;
@@ -60,28 +59,7 @@ fn get_config_directory() -> Result<PathBuf> {
 }
 
 fn create_default_config(config_path: &PathBuf) -> Result<()> {
-    // 构造默认配置结构体
-    let default_cfg = Config {
-        hot_key: HotKey {
-            screen_shot: vec![Key::CapsLock],
-            audio_record: vec![Key::Tab],
-        },
-        screen_shot: Screenshot {
-            format: ScreenshotFormat::Avif,
-            quality: 60,
-            speed: 6,
-            exclude_title_bar: true,
-            field_name: "Picture".to_string(), // Anki note field name for screenshot
-        },
-        audio_record: AudioRecord {
-            format: AudioFormat::Opus,               // Audio format
-            sample_rate: 48000, // opus Sampling rate of input signal (Hz) This must be one of 8000, 12000, 16000, 24000, or 48000.
-            field_name: "SentenceAudio".to_string(), // Anki note field name for audio
-        },
-        anki: Anki {
-            anki_connect_url: "http://127.0.0.1:8765".to_string(), // Anki Connect URL
-        },
-    };
+    let default_cfg = Config::default();
     // 序列化为 TOML
     let default_content = toml::to_string_pretty(&default_cfg)
         .map_err(|e| anyhow::anyhow!("Failed to serialize default config: {}", e))?;

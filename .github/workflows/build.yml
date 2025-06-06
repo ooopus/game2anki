@@ -1,0 +1,49 @@
+name: Build for Windows
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+env:
+  program_name: game2anki
+
+jobs:
+  build:
+    strategy:
+      matrix:
+        arch: [amd64, arm64]
+    runs-on: windows-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Install Rust toolchain
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          toolchain: stable
+
+      - name: Build for target
+        shell: bash
+        run: |
+          arch=${{ matrix.arch }}
+          program_name=${{ env.program_name }}
+
+          # 设置目标架构
+          if [ "$arch" == "amd64" ]; then
+            target=x86_64-pc-windows-msvc
+          elif [ "$arch" == "arm64" ]; then
+            target=aarch64-pc-windows-msvc
+          fi
+
+          echo "构建目标: $target"
+          rustup target add $target
+          cargo build --release --target=$target
+
+      - name: Upload Artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ env.program_name }}_windows_${{ matrix.arch }}
+          path: target/$target/release/$program_name.exe

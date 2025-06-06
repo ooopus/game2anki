@@ -39,6 +39,8 @@ impl AudioRecorder {
 
         if max_amplitude > 0.0 && max_amplitude < 1.0 {
             let scale_factor = 0.95 / max_amplitude; // 留一点余量避免削波
+            debug!("Normalizing audio with scale factor: {}", scale_factor);
+
             for sample in samples.iter_mut() {
                 *sample *= scale_factor;
             }

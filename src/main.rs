@@ -14,8 +14,18 @@ use tokio::sync::mpsc;
 
 #[tokio::main]
 async fn main() -> Result<()> {
-    simple_logger::init_with_level(log::Level::Debug).unwrap();
     let cfg = Arc::new(config::load_user_config()?);
+
+    // 初始化日志系统
+    let log_level = match cfg.log_level {
+        config::LogLevel::Trace => log::Level::Trace,
+        config::LogLevel::Debug => log::Level::Debug,
+        config::LogLevel::Info => log::Level::Info,
+        config::LogLevel::Warn => log::Level::Warn,
+        config::LogLevel::Error => log::Level::Error,
+    };
+    simple_logger::init_with_level(log_level).unwrap();
+
     let anki = Arc::new(AnkiClient::new(&cfg.anki));
 
     hotkey_manager::HotKeyManager::init();

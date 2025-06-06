@@ -7,17 +7,6 @@ mod capture;
 mod encode;
 use crate::utils::file::generate_safe_filename;
 use encode::encode;
-impl Default for Screenshot {
-    fn default() -> Self {
-        Self {
-            format: crate::config::ScreenshotFormat::Avif,
-            field_name: "Picture".to_string(),
-            quality: 80,
-            speed: 6,
-            exclude_title_bar: true,
-        }
-    }
-}
 
 pub struct AnkiScreenshot {
     cfg: Screenshot,
