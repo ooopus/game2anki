@@ -48,7 +48,7 @@ fn setup_screenshot_hotkey(cfg: Arc<config::Config>, anki: Arc<AnkiClient>) {
             eprintln!("Failed to send screenshot signal: {}", e);
         }
     });
-
+    
     tokio::spawn(async move {
         while let Some(_) = screenshot_rx.recv().await {
             if let Err(e) = screenshot_tool.on_hotkey_clicked().await {

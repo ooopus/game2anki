@@ -1,15 +1,18 @@
-use crate::{anki::AnkiClient, config::AudioRecord, utils::file::generate_safe_filename};
-
+use crate::{
+    anki::AnkiClient,
+    config::AudioRecord,
+    utils::{border::BorderOverlay, file::generate_safe_filename},
+};
 use log::{debug, error, info};
-
 mod encode;
 use encode::encode;
-use std::collections::VecDeque;
-use std::error;
-use std::fs;
-use std::path::PathBuf;
-use std::sync::{Arc, Mutex};
-use std::thread;
+use std::{
+    collections::VecDeque,
+    error, fs,
+    path::PathBuf,
+    sync::{Arc, Mutex},
+    thread,
+};
 use wasapi::{Direction, SampleType, StreamMode, WaveFormat, get_default_device, initialize_mta};
 type Res<T> = Result<T, Box<dyn error::Error>>;
 
@@ -20,6 +23,7 @@ pub struct AudioRecorder {
     channels: u16,
     anki: Arc<AnkiClient>,
     cfg: AudioRecord,
+    border: Arc<Mutex<Option<BorderOverlay>>>,
 }
 
 impl AudioRecorder {
@@ -28,22 +32,25 @@ impl AudioRecorder {
             is_recording: Arc::new(Mutex::new(false)),
             audio_buffer: Arc::new(Mutex::new(Vec::new())),
             channels: 2,
-            anki: anki,
-            cfg: cfg,
+            anki,
+            cfg,
+            border: Arc::new(Mutex::new(None)),
         }
     }
 
-    // 音频归一化
     fn normalize_audio(samples: &mut [f32]) {
         let max_amplitude = samples.iter().map(|&x| x.abs()).fold(0.0f32, f32::max);
 
-        if max_amplitude > 0.0 && max_amplitude < 1.0 {
-            let scale_factor = 0.95 / max_amplitude; // 留一点余量避免削波
+        // 设定合理的阈值范围，避免微调或过度增强
+        if max_amplitude > 0.0 && (max_amplitude < 0.7 || max_amplitude > 1.0) {
+            let scale_factor = 0.95 / max_amplitude.clamp(1e-6, 1.0); // 避免除以0
             debug!("Normalizing audio with scale factor: {}", scale_factor);
 
             for sample in samples.iter_mut() {
                 *sample *= scale_factor;
             }
+        } else {
+            debug!("Skipping normalization. max_amplitude: {}", max_amplitude);
         }
     }
 
@@ -125,79 +132,68 @@ impl AudioRecorder {
     pub fn start_recording(&self) -> Res<()> {
         let _ = initialize_mta();
         {
-            let mut recording = self.is_recording.lock().unwrap();
-            if *recording {
+            let mut rec = self.is_recording.lock().unwrap();
+            if *rec {
                 return Err("Already recording".into());
             }
-            *recording = true;
+            *rec = true;
         }
+        // 清空缓冲
+        self.audio_buffer.lock().unwrap().clear();
 
-        // 清空缓冲区
-        {
-            let mut buffer = self.audio_buffer.lock().unwrap();
-            buffer.clear();
-        }
+        let new_border = BorderOverlay::new()?;
+        *self.border.lock().unwrap() = Some(new_border);
 
-        let is_recording = Arc::clone(&self.is_recording);
-        let audio_buffer = Arc::clone(&self.audio_buffer);
-        let sample_rate = self.cfg.sample_rate;
-        let channels = self.channels;
-
+        // 启动录音线程
+        let is_rec = Arc::clone(&self.is_recording);
+        let audio_buf = Arc::clone(&self.audio_buffer);
+        let sr = self.cfg.sample_rate as usize;
+        let ch = self.channels;
         thread::Builder::new()
-            .name("AudioCapture".to_string())
+            .name("AudioCapture".into())
             .spawn(move || {
-                if let Err(e) =
-                    Self::capture_loop(is_recording, audio_buffer, sample_rate as usize, channels)
-                {
+                if let Err(e) = Self::capture_loop(is_rec, audio_buf, sr, ch) {
                     error!("Audio capture loop failed: {}", e);
                 }
             })?;
-
-        info!("Recording started");
         Ok(())
     }
 
     // 停止录音并保存
     pub async fn stop_recording_and_save(&self) -> Res<()> {
-        // 停止录音
-        {
-            let mut recording = self.is_recording.lock().unwrap();
-            *recording = false;
+        *self.is_recording.lock().unwrap() = false;
+
+        if let Some(border_to_stop) = self.border.lock().unwrap().take() {
+            border_to_stop.stop();
         }
 
-        // 等待一小段时间确保录音线程结束
+        // 等待录音线程真正退出
         thread::sleep(std::time::Duration::from_millis(100));
 
-        // 获取录音数据
-        let audio_data = {
-            let buffer = self.audio_buffer.lock().unwrap();
-            buffer.clone()
+        // 获取并处理音频数据
+        let mut data = {
+            let buf = self.audio_buffer.lock().unwrap();
+            buf.clone()
         };
-
-        if audio_data.is_empty() {
+        if data.is_empty() {
             return Err("No audio data recorded".into());
         }
-
-        info!("Processing {} audio samples", audio_data.len());
-        let mut normalized_data = audio_data;
-        Self::normalize_audio(&mut normalized_data);
-        // 裁剪两端静音（阈值可以根据需要调整）
-        let trimmed = Self::trim_silence(&normalized_data, 0.01);
-        // 若裁剪后为空则报错
+        Self::normalize_audio(&mut data);
+        let trimmed = Self::trim_silence(&data, 0.01);
         if trimmed.is_empty() {
             return Err("Audio is silent after trimming".into());
         }
-        // 转换格式
-        let _data = encode(
+
+        // 编码、保存并更新 Anki
+        let raw = encode(
             self.cfg.format.clone(),
-            &trimmed,
+            trimmed,
             self.cfg.sample_rate,
             self.channels,
         )?;
-        let filename = generate_safe_filename(&self.cfg.field_name, &self.cfg.format.to_string());
-        // 保存到Anki
-        self.save_to_anki(_data, &filename).await?;
-        info!("Recording saved as: {}", filename);
+        let fname = generate_safe_filename(&self.cfg.field_name, &self.cfg.format.to_string());
+        self.save_to_anki(raw, &fname).await?;
+        info!("Recording saved as: {}", fname);
         Ok(())
     }
 

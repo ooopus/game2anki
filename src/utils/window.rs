@@ -1,5 +1,4 @@
 use windows_capture::window::Window;
-
 /// 获取当前前台窗口的标题
 pub fn get_foreground_window_name() -> String {
     match Window::foreground() {

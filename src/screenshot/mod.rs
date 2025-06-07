@@ -40,6 +40,7 @@ impl AnkiScreenshot {
         let media_dir = self.anki.get_media_dir().await?;
         let file_path = std::path::Path::new(&media_dir).join(&filename);
         std::fs::write(&file_path, &_data)?;
+        debug!("截图已保存到文件: {}", file_path.display());
         // 更新卡片字段
         self.anki
             .update_note_field(
