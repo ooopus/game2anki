@@ -1,4 +1,4 @@
-use super::key_parse::keys_from_str_de;
+use crate::utils::keyboard::keys_from_str_de;
 use rdev::Key;
 use serde::{Deserialize, Serialize};
 use std::fmt;
@@ -187,6 +187,18 @@ impl fmt::Display for LogLevel {
             LogLevel::Info => write!(f, "info"),
             LogLevel::Warn => write!(f, "warn"),
             LogLevel::Error => write!(f, "error"),
+        }
+    }
+}
+
+impl From<LogLevel> for log::Level {
+    fn from(level: LogLevel) -> Self {
+        match level {
+            LogLevel::Trace => log::Level::Trace,
+            LogLevel::Debug => log::Level::Debug,
+            LogLevel::Info => log::Level::Info,
+            LogLevel::Warn => log::Level::Warn,
+            LogLevel::Error => log::Level::Error,
         }
     }
 }

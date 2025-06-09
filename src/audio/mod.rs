@@ -43,7 +43,7 @@ impl AudioRecorder {
 
         // 设定合理的阈值范围，避免微调或过度增强
         if max_amplitude > 0.0 && (max_amplitude < 0.7 || max_amplitude > 1.0) {
-            let scale_factor = 0.95 / max_amplitude.clamp(1e-6, 1.0); // 避免除以0
+            let scale_factor = 0.95 / max_amplitude.max(1e-6); // 避免除以0
             debug!("Normalizing audio with scale factor: {}", scale_factor);
 
             for sample in samples.iter_mut() {

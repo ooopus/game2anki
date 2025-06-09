@@ -1,7 +1,6 @@
 use anyhow::{Context, Result};
 use std::fs;
 use std::path::PathBuf;
-pub mod key_parse;
 mod types;
 
 pub use types::*;

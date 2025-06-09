@@ -1,5 +1,6 @@
+use crate::utils::window::SendableHWND;
 use anyhow::Result;
-use std::sync::mpsc; // Used for communication between threads
+use std::sync::mpsc;
 use std::thread;
 use windows::{
     Win32::{
@@ -22,22 +23,6 @@ use windows::{
 };
 
 const BORDER_THICKNESS: i32 = 8;
-
-/// A thread-safe wrapper for HWND that implements Send and Sync.
-/// This makes it safe to pass the window handle between threads.
-#[derive(Clone, Copy)]
-struct SendableHWND(HWND);
-unsafe impl Send for SendableHWND {}
-unsafe impl Sync for SendableHWND {}
-
-impl SendableHWND {
-    fn new(hwnd: HWND) -> Self {
-        Self(hwnd)
-    }
-    fn hwnd(&self) -> HWND {
-        self.0
-    }
-}
 
 /// An overlay window that draws a red border and can be safely closed.
 pub struct BorderOverlay {
