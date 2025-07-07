@@ -4,7 +4,7 @@ version = '0.1.0'
 edition = '2024'
 
 [dependencies]
-windows = { version = "0.61.1", features = [
+windows = { version = "0.61.3", features = [
     'Win32_System_LibraryLoader',
     'Win32_UI_Accessibility',
 ] }
@@ -16,13 +16,13 @@ tokio = { version = '1.45.1', features = [
 anyhow = '1.0.98'
 config = '0.15.11'
 image = '0.25.6'
-reqwest = { version = '0.12.19', features = ['json'] }
+reqwest = { version = '0.12.20', features = ['json'] }
 serde = { version = '1.0.219', features = ['derive'] }
 serde_json = '1.0.140'
 tempfile = '3.20.0'
 toml = '0.8.23'
-wasapi = '0.18.0'
-ravif = '0.11.12'
+wasapi = '0.19.0'
+ravif = '0.12.0'
 opus = '0.3.0'
 rdev = { version = '0.5.3', features = ['serialize'] }
 rgb = '0.8.50'
@@ -38,3 +38,10 @@ flacenc = "0.4.0"
 webp = "0.3.0"
 strum = "0.27.1"
 strum_macros = "0.27.1"
+dirs = "6.0.0"
+winit = "0.30.11"
+softbuffer = "0.4.6"
+
+[profile.release]
+lto = "fat"
+codegen-units = 1

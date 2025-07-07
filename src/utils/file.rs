@@ -18,5 +18,5 @@ pub fn generate_safe_filename(prefix: &str, ext: &str) -> String {
         .map(|c| if r#"/\?%*:|"<>."#.contains(c) { '_' } else { c })
         .collect();
 
-    format!("{}_{}_{}.{}", prefix, safe_window_name, timestamp, ext)
+    format!("{prefix}_{safe_window_name}_{timestamp}.{ext}")
 }

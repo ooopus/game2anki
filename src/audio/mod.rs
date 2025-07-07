@@ -42,15 +42,15 @@ impl AudioRecorder {
         let max_amplitude = samples.iter().map(|&x| x.abs()).fold(0.0f32, f32::max);
 
         // 设定合理的阈值范围，避免微调或过度增强
-        if max_amplitude > 0.0 && (max_amplitude < 0.7 || max_amplitude > 1.0) {
+        if max_amplitude > 0.0 && !(0.7..=1.0).contains(&max_amplitude) {
             let scale_factor = 0.95 / max_amplitude.max(1e-6); // 避免除以0
-            debug!("Normalizing audio with scale factor: {}", scale_factor);
+            debug!("Normalizing audio with scale factor: {scale_factor}");
 
             for sample in samples.iter_mut() {
                 *sample *= scale_factor;
             }
         } else {
-            debug!("Skipping normalization. max_amplitude: {}", max_amplitude);
+            debug!("Skipping normalization. max_amplitude: {max_amplitude}");
         }
     }
 
@@ -108,8 +108,8 @@ impl AudioRecorder {
             while sample_queue.len() >= 4 {
                 // 4 bytes per f32 sample
                 let mut bytes = [0u8; 4];
-                for i in 0..4 {
-                    bytes[i] = sample_queue.pop_front().unwrap();
+                for byte in &mut bytes {
+                    *byte = sample_queue.pop_front().unwrap();
                 }
                 let sample = f32::from_le_bytes(bytes);
 
@@ -153,7 +153,7 @@ impl AudioRecorder {
             .name("AudioCapture".into())
             .spawn(move || {
                 if let Err(e) = Self::capture_loop(is_rec, audio_buf, sr, ch) {
-                    error!("Audio capture loop failed: {}", e);
+                    error!("Audio capture loop failed: {e}");
                 }
             })?;
         Ok(())
@@ -193,7 +193,7 @@ impl AudioRecorder {
         )?;
         let fname = generate_safe_filename(&self.cfg.field_name, &self.cfg.format.to_string());
         self.save_to_anki(raw, &fname).await?;
-        info!("Recording saved as: {}", fname);
+        info!("Recording saved as: {fname}");
         Ok(())
     }
 
@@ -211,11 +211,11 @@ impl AudioRecorder {
             .update_note_field(
                 note_id,
                 &self.cfg.field_name,
-                &format!("[sound:{}]", filename),
+                &format!("[sound:{filename}]"),
             )
             .await?;
 
-        info!("Audio saved to Anki note: {}", note_id);
+        info!("Audio saved to Anki note: {note_id}");
         Ok(())
     }
 
@@ -248,7 +248,7 @@ pub fn on_hotkey_clicked(recorder: &AudioRecorder) -> Res<()> {
         let recorder_clone = recorder.clone();
         tokio::spawn(async move {
             if let Err(e) = recorder_clone.stop_recording_and_save().await {
-                error!("Failed to stop recording: {}", e);
+                error!("Failed to stop recording: {e}");
             }
         });
     } else {

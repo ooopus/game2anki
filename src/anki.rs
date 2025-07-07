@@ -73,10 +73,7 @@ impl AnkiClient {
             .await?;
         let data: Value = response.json().await?;
         if data["error"].is_null() {
-            debug!(
-                "Note updated successfully: ID {}, Field: {}, Value: {}",
-                note_id, field, value
-            );
+            debug!("Note updated successfully: ID {note_id}, Field: {field}, Value: {value}");
             Ok(())
         } else {
             Err(anyhow!("Failed to update note: {}", data["error"]))

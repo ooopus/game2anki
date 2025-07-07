@@ -11,7 +11,9 @@ use std::thread;
 pub struct HotKeyManager;
 
 // 全局注册表，支持组合键
-static HOTKEY_REGISTRY: Lazy<Arc<Mutex<HashMap<KeyCombo, Vec<Box<dyn Fn() + Send + 'static>>>>>> =
+type HotkeyCallback = Box<dyn Fn() + Send + 'static>;
+type HotkeyMap = HashMap<KeyCombo, Vec<HotkeyCallback>>;
+static HOTKEY_REGISTRY: Lazy<Arc<Mutex<HotkeyMap>>> =
     Lazy::new(|| Arc::new(Mutex::new(HashMap::new())));
 
 // 监听器启动状态
@@ -24,7 +26,7 @@ impl std::hash::Hash for KeyCombo {
     fn hash<H: std::hash::Hasher>(&self, state: &mut H) {
         // HashSet is not order-dependent, so hash all keys in sorted order
         let mut keys: Vec<_> = self.0.iter().collect();
-        keys.sort_by_key(|k| format!("{:?}", k));
+        keys.sort_by_key(|k| format!("{k:?}"));
         for key in keys {
             std::mem::discriminant(key).hash(state);
             if let Key::Unknown(val) = key {
@@ -80,7 +82,7 @@ impl HotKeyManager {
                                     combo
                                 );
                                 for cb in callbacks {
-                                    log::debug!("Callback triggered for combo: {:?}", combo);
+                                    log::debug!("Callback triggered for combo: {combo:?}");
                                     cb();
                                 }
                             }

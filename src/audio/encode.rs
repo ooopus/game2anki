@@ -29,7 +29,7 @@ pub fn encode_to_ogg_opus(samples: &[f32], sample_rate: u32, channels: u16) -> R
         1 => Channels::Mono,
         2 => Channels::Stereo,
         _ => {
-            error!("Unsupported channel count for Opus: {}", channels);
+            error!("Unsupported channel count for Opus: {channels}");
             return Err("Unsupported channel count".into());
         }
     };
@@ -39,14 +39,13 @@ pub fn encode_to_ogg_opus(samples: &[f32], sample_rate: u32, channels: u16) -> R
         Ok(enc) => enc,
         Err(e) => {
             error!(
-                "Failed to create Opus encoder: sample_rate={}, channels={:?}, error={}",
-                sample_rate, opus_channels, e
+                "Failed to create Opus encoder: sample_rate={sample_rate}, channels={opus_channels:?}, error={e}"
             );
             return Err(e.into());
         }
     };
     if let Err(e) = encoder.set_bitrate(opus::Bitrate::Bits(128 * 1000)) {
-        error!("Failed to set Opus bitrate: {}", e);
+        error!("Failed to set Opus bitrate: {e}");
     }
 
     // Ogg Opus header (ID + Comment)
@@ -59,7 +58,7 @@ pub fn encode_to_ogg_opus(samples: &[f32], sample_rate: u32, channels: u16) -> R
         v.push(1); // Version
         v.push(channels as u8); // Channel count
         v.extend_from_slice(&(pre_skip as u16).to_le_bytes()); // Pre-skip
-        v.extend_from_slice(&(sample_rate as u32).to_le_bytes()); // Original sample rate
+        v.extend_from_slice(&sample_rate.to_le_bytes()); // Original sample rate
         v.extend_from_slice(&[0u8; 2]); // Output gain
         v.push(0); // Channel mapping family
         v
@@ -96,7 +95,7 @@ pub fn encode_to_ogg_opus(samples: &[f32], sample_rate: u32, channels: u16) -> R
                 )?;
             }
             Err(e) => {
-                error!("Opus encoding error: {}", e);
+                error!("Opus encoding error: {e}");
             }
         }
     }
@@ -114,32 +113,32 @@ pub fn encode_to_mp3(samples: &[f32], sample_rate: u32, channels: u16) -> Res<Ve
     // Create and configure encoder
     let mut builder = Builder::new().ok_or_else(|| {
         let msg = "Failed to create LAME builder";
-        error!("{}", msg);
+        error!("{msg}");
         msg.to_string()
     })?;
     builder.set_num_channels(channels as u8).map_err(|e| {
-        error!("Failed to set channels: {}", e);
+        error!("Failed to set channels: {e}");
         e.to_string()
     })?;
     builder.set_sample_rate(sample_rate).map_err(|e| {
-        error!("Failed to set sample rate: {}", e);
+        error!("Failed to set sample rate: {e}");
         e.to_string()
     })?;
     builder
         .set_brate(mp3lame_encoder::Bitrate::Kbps192)
         .map_err(|e| {
-            error!("Failed to set bitrate: {}", e);
+            error!("Failed to set bitrate: {e}");
             e.to_string()
         })?;
     builder
         .set_quality(mp3lame_encoder::Quality::Best)
         .map_err(|e| {
-            error!("Failed to set quality: {}", e);
+            error!("Failed to set quality: {e}");
             e.to_string()
         })?;
 
     let mut encoder = builder.build().map_err(|e| {
-        error!("Failed to build LAME encoder: {}", e);
+        error!("Failed to build LAME encoder: {e}");
         e.to_string()
     })?;
 
@@ -156,7 +155,7 @@ pub fn encode_to_mp3(samples: &[f32], sample_rate: u32, channels: u16) -> Res<Ve
             let encoded_size = encoder
                 .encode(input, mp3_out.spare_capacity_mut())
                 .map_err(|e| {
-                    error!("MP3 encoding error: {}", e);
+                    error!("MP3 encoding error: {e}");
                     e.to_string()
                 })?;
 
@@ -171,7 +170,7 @@ pub fn encode_to_mp3(samples: &[f32], sample_rate: u32, channels: u16) -> Res<Ve
             let encoded_size = encoder
                 .encode(input, mp3_out.spare_capacity_mut())
                 .map_err(|e| {
-                    error!("MP3 encoding error: {}", e);
+                    error!("MP3 encoding error: {e}");
                     e.to_string()
                 })?;
 
@@ -179,7 +178,7 @@ pub fn encode_to_mp3(samples: &[f32], sample_rate: u32, channels: u16) -> Res<Ve
                 mp3_out.set_len(mp3_out.len() + encoded_size);
             }
         } else {
-            error!("Unsupported channel count for MP3: {}", channels);
+            error!("Unsupported channel count for MP3: {channels}");
             return Err("Unsupported channel count".into());
         }
     }
@@ -190,7 +189,7 @@ pub fn encode_to_mp3(samples: &[f32], sample_rate: u32, channels: u16) -> Res<Ve
     let flushed_size = encoder
         .flush::<FlushNoGap>(mp3_out.spare_capacity_mut())
         .map_err(|e| {
-            error!("MP3 flush error: {}", e);
+            error!("MP3 flush error: {e}");
             e.to_string()
         })?;
     unsafe {

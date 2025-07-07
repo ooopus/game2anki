@@ -46,11 +46,11 @@ impl AnkiScreenshot {
             .update_note_field(
                 note_id,
                 &self.cfg.field_name,
-                &format!("<img src=\"{}\">", filename),
+                &format!("<img src=\"{filename}\">"),
             )
             .await?;
 
-        info!("截图已成功保存到Anki卡片 ID: {}", note_id);
+        info!("截图已成功保存到Anki卡片 ID: {note_id}");
         Ok(())
     }
 }

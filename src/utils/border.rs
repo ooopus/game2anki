@@ -1,35 +1,30 @@
-use crate::utils::window::SendableHWND;
 use anyhow::Result;
+use softbuffer::{Context, Surface};
+use std::num::NonZeroU32;
+use std::rc::Rc;
 use std::sync::mpsc;
 use std::thread;
-use windows::{
-    Win32::{
-        Foundation::{COLORREF, HINSTANCE, HWND, LPARAM, LRESULT, RECT, WPARAM},
-        Graphics::Gdi::{
-            BeginPaint, CreateSolidBrush, DeleteObject, EndPaint, FillRect, PAINTSTRUCT,
-            UpdateWindow,
-        },
-        System::LibraryLoader::GetModuleHandleW,
-        UI::WindowsAndMessaging::{
-            CS_HREDRAW, CS_VREDRAW, CreateWindowExW, DefWindowProcW, DispatchMessageW,
-            GetClientRect, GetMessageW, GetSystemMetrics, IDC_ARROW, LWA_COLORKEY, LoadCursorW,
-            MSG, PostMessageW, PostQuitMessage, RegisterClassExW, SM_CXSCREEN, SM_CYSCREEN,
-            SW_SHOWNOACTIVATE, SetLayeredWindowAttributes, ShowWindow, TranslateMessage,
-            WM_DESTROY, WM_ERASEBKGND, WM_PAINT, WNDCLASSEXW, WS_EX_LAYERED, WS_EX_NOACTIVATE,
-            WS_EX_TOOLWINDOW, WS_EX_TOPMOST, WS_EX_TRANSPARENT, WS_POPUP, WS_VISIBLE,
-        },
-    },
-    core::PCWSTR,
+use winit::{
+    application::ApplicationHandler,
+    event::WindowEvent,
+    event_loop::{ActiveEventLoop, EventLoop, EventLoopProxy},
+    platform::windows::EventLoopBuilderExtWindows,
+    window::{Window, WindowId, WindowLevel},
 };
 
-const BORDER_THICKNESS: i32 = 8;
+const BORDER_THICKNESS: u32 = 8;
+const BORDER_COLOR: u32 = 0x00FF0000; // Red
+
+#[derive(Debug)]
+enum UserEvent {
+    Shutdown,
+}
 
 /// An overlay window that draws a red border and can be safely closed.
 pub struct BorderOverlay {
-    /// The handle to the overlay window, wrapped for thread safety.
-    hwnd: SendableHWND,
     /// The handle to the thread that manages the window.
     thread_handle: Option<thread::JoinHandle<()>>,
+    proxy: Option<EventLoopProxy<UserEvent>>,
 }
 
 impl BorderOverlay {
@@ -38,165 +33,150 @@ impl BorderOverlay {
     /// This function spawns a new thread to handle the window's message loop.
     /// It waits until the window is successfully created before returning.
     pub fn new() -> Result<Self> {
-        // Create a channel to receive the SendableHWND from the spawned thread.
+        // Create a channel to receive a signal from the spawned thread.
         let (tx, rx) = mpsc::channel();
 
         let thread_handle = thread::spawn(move || {
             // This closure runs on the new thread.
             if let Err(e) = Self::window_thread_main(tx) {
-                eprintln!("Window thread failed: {}", e);
+                eprintln!("Window thread failed: {e}");
             }
         });
 
-        // Block and wait for the spawned thread to send the SendableHWND.
-        let hwnd = rx.recv()?;
+        // Block and wait for the spawned thread to send the signal.
+        let proxy = rx.recv()?;
 
         Ok(Self {
-            hwnd,
             thread_handle: Some(thread_handle),
+            proxy: Some(proxy),
         })
     }
 
     /// The main function for the windowing thread.
-    fn window_thread_main(tx: mpsc::Sender<SendableHWND>) -> Result<()> {
-        // 1. Register the window class.
-        let class_name = format!("RustBorderOverlay_{}", std::process::id());
-        let wname: Vec<u16> = class_name.encode_utf16().chain(Some(0)).collect();
-        let hinst: HINSTANCE = unsafe { GetModuleHandleW(None)? }.into();
-
-        let wc = WNDCLASSEXW {
-            cbSize: std::mem::size_of::<WNDCLASSEXW>() as u32,
-            style: CS_HREDRAW | CS_VREDRAW,
-            lpfnWndProc: Some(Self::wnd_proc),
-            hInstance: hinst,
-            hCursor: unsafe { LoadCursorW(None, IDC_ARROW)? },
-            lpszClassName: PCWSTR(wname.as_ptr()),
-            ..Default::default()
-        };
-        unsafe { RegisterClassExW(&wc) };
-
-        // 2. Create a fullscreen overlay window.
-        let screen_w = unsafe { GetSystemMetrics(SM_CXSCREEN) };
-        let screen_h = unsafe { GetSystemMetrics(SM_CYSCREEN) };
-
-        let hwnd = unsafe {
-            CreateWindowExW(
-                WS_EX_LAYERED
-                    | WS_EX_TRANSPARENT
-                    | WS_EX_TOPMOST
-                    | WS_EX_TOOLWINDOW
-                    | WS_EX_NOACTIVATE,
-                PCWSTR(wname.as_ptr()),
-                PCWSTR::null(),
-                WS_POPUP | WS_VISIBLE,
-                0,
-                0,
-                screen_w,
-                screen_h,
-                None,
-                None,
-                Some(hinst),
-                None,
-            )?
-        };
-
-        // 3. Configure window attributes for transparency.
-        unsafe {
-            SetLayeredWindowAttributes(hwnd, COLORREF(0), 255, LWA_COLORKEY)?;
-            let _ = ShowWindow(hwnd, SW_SHOWNOACTIVATE);
-            let _ = UpdateWindow(hwnd);
-        }
-
-        // Wrap the HWND and send it back to the main thread.
-        tx.send(SendableHWND::new(hwnd))
-            .expect("Main thread disconnected");
-
-        // 4. Run the message loop.
-        let mut msg = MSG::default();
-        while unsafe { GetMessageW(&mut msg, None, 0, 0) }.as_bool() {
-            unsafe {
-                let _ = TranslateMessage(&msg);
-                DispatchMessageW(&msg);
-            }
-        }
+    fn window_thread_main(tx: mpsc::Sender<EventLoopProxy<UserEvent>>) -> Result<()> {
+        let event_loop = EventLoop::with_user_event()
+            .with_any_thread(true)
+            .build()
+            .unwrap();
+        let proxy = event_loop.create_proxy();
+        let mut state = State::default();
+        // Send signal once the event loop is created
+        tx.send(proxy).expect("Main thread disconnected");
+        let _ = event_loop.run_app(&mut state);
         Ok(())
     }
 
     /// Posts a message to destroy the window and joins the thread.
     pub fn stop(mut self) {
+        if let Some(proxy) = self.proxy.take() {
+            proxy.send_event(UserEvent::Shutdown).ok();
+        }
         if let Some(handle) = self.thread_handle.take() {
-            unsafe {
-                let _ = PostMessageW(Some(self.hwnd.hwnd()), WM_DESTROY, WPARAM(0), LPARAM(0));
-            }
             let _ = handle.join();
         }
     }
+}
 
-    /// The Window Procedure (WndProc) to handle messages for our window class.
-    unsafe extern "system" fn wnd_proc(
-        hwnd: HWND,
-        msg: u32,
-        wparam: WPARAM,
-        lparam: LPARAM,
-    ) -> LRESULT {
-        match msg {
-            WM_PAINT => unsafe {
-                let mut ps = PAINTSTRUCT::default();
-                let hdc = BeginPaint(hwnd, &mut ps);
-                let mut rc = RECT::default();
-                let _ = GetClientRect(hwnd, &mut rc);
+#[derive(Default)]
+struct State {
+    window: Option<Rc<Window>>,
+    context: Option<Context<Rc<Window>>>,
+    surface: Option<Surface<Rc<Window>, Rc<Window>>>,
+}
 
-                let brush_bkg = CreateSolidBrush(COLORREF(0));
-                FillRect(hdc, &rc, brush_bkg);
-                let _ = DeleteObject(brush_bkg.into());
+impl ApplicationHandler<UserEvent> for State {
+    // This is a common indicator that you can create a window.
+    fn resumed(&mut self, event_loop: &ActiveEventLoop) {
+        let primary_monitor = event_loop.primary_monitor().unwrap();
+        let monitor_size = primary_monitor.size();
+        let monitor_pos = primary_monitor.position();
 
-                let brush_red = CreateSolidBrush(COLORREF(0x000000FF));
-                let borders = [
-                    RECT {
-                        top: rc.top,
-                        bottom: rc.top + BORDER_THICKNESS,
-                        ..rc
-                    },
-                    RECT {
-                        top: rc.bottom - BORDER_THICKNESS,
-                        bottom: rc.bottom,
-                        ..rc
-                    },
-                    RECT {
-                        left: rc.left,
-                        right: rc.left + BORDER_THICKNESS,
-                        ..rc
-                    },
-                    RECT {
-                        left: rc.right - BORDER_THICKNESS,
-                        right: rc.right,
-                        ..rc
-                    },
-                ];
-                for b in &borders {
-                    FillRect(hdc, b, brush_red);
+        let window_attributes = Window::default_attributes()
+            .with_decorations(false)
+            .with_transparent(true)
+            .with_position(monitor_pos)
+            .with_inner_size(monitor_size)
+            .with_active(false)
+            .with_window_level(WindowLevel::AlwaysOnTop);
+        let window = Rc::new(event_loop.create_window(window_attributes).unwrap());
+        if let Err(e) = window.set_cursor_hittest(false) {
+            eprintln!("Failed to set cursor hittest: {e}");
+        }
+        let context = Context::new(window.clone()).unwrap();
+        let surface = Surface::new(&context, window.clone()).unwrap();
+        self.window = Some(window);
+        self.context = Some(context);
+        self.surface = Some(surface);
+    }
+
+    fn user_event(&mut self, event_loop: &ActiveEventLoop, event: UserEvent) {
+        match event {
+            UserEvent::Shutdown => {
+                event_loop.exit();
+            }
+        }
+    }
+
+    fn window_event(
+        &mut self,
+        event_loop: &ActiveEventLoop,
+        window_id: WindowId,
+        event: WindowEvent,
+    ) {
+        let window = match self.window.as_ref() {
+            Some(window) => window,
+            None => return,
+        };
+
+        if window.id() != window_id {
+            return;
+        }
+        let surface = self.surface.as_mut().unwrap();
+        match event {
+            WindowEvent::RedrawRequested => {
+                let (width, height) = {
+                    let size = window.inner_size();
+                    (size.width, size.height)
+                };
+
+                if let (Some(width), Some(height)) =
+                    (NonZeroU32::new(width), NonZeroU32::new(height))
+                {
+                    surface.resize(width, height).unwrap();
+
+                    let mut buffer = surface.buffer_mut().unwrap();
+                    for y in 0..height.get() {
+                        for x in 0..width.get() {
+                            let color = if x < BORDER_THICKNESS
+                                || x >= width.get() - BORDER_THICKNESS
+                                || y < BORDER_THICKNESS
+                                || y >= height.get() - BORDER_THICKNESS
+                            {
+                                BORDER_COLOR
+                            } else {
+                                0x00000000 // Transparent
+                            };
+                            buffer[(y * width.get() + x) as usize] = color;
+                        }
+                    }
+
+                    buffer.present().unwrap();
                 }
-                let _ = DeleteObject(brush_red.into());
-
-                let _ = EndPaint(hwnd, &ps);
-                LRESULT(0)
-            },
-            WM_ERASEBKGND => LRESULT(1),
-            WM_DESTROY => unsafe {
-                PostQuitMessage(0);
-                LRESULT(0)
-            },
-            _ => unsafe { DefWindowProcW(hwnd, msg, wparam, lparam) },
+            }
+            WindowEvent::CloseRequested => {
+                event_loop.exit();
+            }
+            _ => (),
         }
     }
 }
 
 impl Drop for BorderOverlay {
     fn drop(&mut self) {
+        if let Some(proxy) = self.proxy.take() {
+            proxy.send_event(UserEvent::Shutdown).ok();
+        }
         if let Some(handle) = self.thread_handle.take() {
-            unsafe {
-                let _ = PostMessageW(Some(self.hwnd.hwnd()), WM_DESTROY, WPARAM(0), LPARAM(0));
-            }
             let _ = handle.join();
         }
     }

@@ -49,7 +49,7 @@ pub fn capture_active_window(cfg: Screenshot) -> Result<DynamicImage> {
             let width = frame_buffer.width();
             let height = frame_buffer.height();
             let rgba = frame_buffer.as_raw_buffer();
-            info!("捕获到帧: {}x{}, 格式: {:?}", width, height, color_format);
+            info!("捕获到帧: {width}x{height}, 格式: {color_format:?}");
             let img = image::RgbaImage::from_raw(width, height, rgba.to_vec())
                 .map(DynamicImage::ImageRgba8)
                 .ok_or_else(|| anyhow!("无法创建图像对象"))?;
@@ -67,7 +67,7 @@ pub fn capture_active_window(cfg: Screenshot) -> Result<DynamicImage> {
 
     // 获取当前焦点窗口
     let focus_window = Window::foreground().unwrap();
-    debug!("当前焦点窗口: {:?}", focus_window);
+    debug!("当前焦点窗口: {focus_window:?}");
 
     // 配置截屏设置
     let settings = Settings::new(

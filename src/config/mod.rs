@@ -11,7 +11,7 @@ pub fn load_user_config() -> Result<Config> {
 
     // 确保配置目录存在
     fs::create_dir_all(&config_dir)
-        .with_context(|| format!("Failed to create config directory: {:?}", config_dir))?;
+        .with_context(|| format!("Failed to create config directory: {config_dir:?}"))?;
 
     if !config_file_path.exists() {
         create_default_config(&config_file_path)?;
@@ -19,7 +19,7 @@ pub fn load_user_config() -> Result<Config> {
 
     // 读取并解析配置文件
     let config_content = fs::read_to_string(&config_file_path)
-        .with_context(|| format!("Failed to read config file: {:?}", config_file_path))?;
+        .with_context(|| format!("Failed to read config file: {config_file_path:?}"))?;
 
     let config: Result<Config, toml::de::Error> = toml::from_str(&config_content);
     match config {
@@ -28,17 +28,14 @@ pub fn load_user_config() -> Result<Config> {
             // 解析失败，自动备份原配置并重建
             let bak_path = config_file_path.with_extension("bak");
             fs::rename(&config_file_path, &bak_path)
-                .with_context(|| format!("Failed to backup old config to {:?}", bak_path))?;
+                .with_context(|| format!("Failed to backup old config to {bak_path:?}"))?;
             create_default_config(&config_file_path)?;
-            let config_content = fs::read_to_string(&config_file_path).with_context(|| {
-                format!("Failed to read new config file: {:?}", config_file_path)
-            })?;
+            let config_content = fs::read_to_string(&config_file_path)
+                .with_context(|| format!("Failed to read new config file: {config_file_path:?}"))?;
             let config: Config = toml::from_str(&config_content)
                 .with_context(|| "Failed to parse new config file")?;
             log::warn!(
-                "Config parse error: {}. Old config has been backed up to {:?}, new config created.",
-                e,
-                bak_path
+                "Config parse error: {e}. Old config has been backed up to {bak_path:?}, new config created."
             );
             Ok(config)
         }
@@ -46,14 +43,10 @@ pub fn load_user_config() -> Result<Config> {
 }
 
 fn get_config_directory() -> Result<PathBuf> {
-    #[cfg(target_os = "windows")]
-    {
-        // Windows: %LOCALAPPDATA%\Game2Anki
-        if let Some(local_appdata) = std::env::var_os("LOCALAPPDATA") {
-            Ok(PathBuf::from(local_appdata).join("Game2Anki"))
-        } else {
-            anyhow::bail!("LOCALAPPDATA environment variable not found")
-        }
+    if let Some(config_dir) = dirs::config_dir() {
+        Ok(config_dir.join("Game2Anki"))
+    } else {
+        anyhow::bail!("Could not determine config directory")
     }
 }
 
@@ -63,7 +56,7 @@ fn create_default_config(config_path: &PathBuf) -> Result<()> {
     let default_content = toml::to_string_pretty(&default_cfg)
         .map_err(|e| anyhow::anyhow!("Failed to serialize default config: {}", e))?;
     fs::write(config_path, default_content)
-        .with_context(|| format!("Failed to write default config to {:?}", config_path))?;
-    log::info!("Created default config file at: {:?}", config_path);
+        .with_context(|| format!("Failed to write default config to {config_path:?}"))?;
+    log::info!("Created default config file at: {config_path:?}");
     Ok(())
 }

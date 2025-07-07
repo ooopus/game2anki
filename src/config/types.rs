@@ -2,7 +2,7 @@ use crate::utils::keyboard::keys_from_str_de;
 use rdev::Key;
 use serde::{Deserialize, Serialize};
 use std::fmt;
-#[derive(Debug, Deserialize, Serialize)]
+#[derive(Debug, Deserialize, Serialize, Default)]
 pub struct Config {
     #[serde(rename = "hotKey")]
     pub hot_key: HotKey,
@@ -18,18 +18,6 @@ pub struct Config {
 
     #[serde(rename = "logLevel")]
     pub log_level: LogLevel,
-}
-
-impl Default for Config {
-    fn default() -> Self {
-        Self {
-            hot_key: HotKey::default(),
-            screen_shot: Screenshot::default(),
-            audio_record: AudioRecord::default(),
-            anki: Anki::default(),
-            log_level: LogLevel::default(),
-        }
-    }
 }
 
 #[derive(Debug, Deserialize, Serialize)]
