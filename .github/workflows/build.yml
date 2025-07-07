@@ -35,90 +35,22 @@ jobs:
           rustup target add $target
           cargo build --release --target=$target
 
-      - name: Create distribution directory
-        shell: bash
-        run: |
-          program_name=${{ env.program_name }}
-          target=x86_64-pc-windows-msvc
-
-          # 创建分发目录
-          mkdir -p dist/${program_name}_windows_x64
-
-          # 复制主程序
-          cp target/$target/release/$program_name.exe dist/${program_name}_windows_x64/
-
-      - name: Extract DLL dependencies
+      - name: Check dependencies (optional)
         shell: powershell
         run: |
           $program_name = "${{ env.program_name }}"
           $target = "x86_64-pc-windows-msvc"
-
           $exe_path = "target\$target\release\$program_name.exe"
-          $dist_dir = "dist\${program_name}_windows_x64"
 
-          # 使用ldd等效工具查找DLL依赖 (在Windows上使用dumpbin或其他工具)
-          # 这里使用PowerShell的方式来获取DLL依赖
-
-          # 获取系统DLL路径
-          $system_paths = @(
-            "$env:SystemRoot\System32",
-            "$env:SystemRoot\SysWOW64"
-          )
-
-          # 使用dumpbin查找依赖 (如果Visual Studio已安装)
-          try {
-            $dumpbin_output = & "dumpbin.exe" /dependents $exe_path 2>$null
-            if ($dumpbin_output) {
-              Write-Host "找到的DLL依赖:"
-              $dumpbin_output | Select-String "\.dll" | ForEach-Object {
-                $dll_name = $_.Line.Trim()
-                Write-Host "  $dll_name"
-                
-                # 查找DLL文件
-                foreach ($path in $system_paths) {
-                  $dll_path = Join-Path $path $dll_name
-                  if (Test-Path $dll_path) {
-                    Write-Host "    复制 $dll_path 到 $dist_dir"
-                    Copy-Item $dll_path $dist_dir -ErrorAction SilentlyContinue
-                    break
-                  }
-                }
-              }
-            }
-          } catch {
-            Write-Host "无法使用dumpbin，尝试其他方法"
+          Write-Host "检查可执行文件依赖:"
+          if (Get-Command "dumpbin.exe" -ErrorAction SilentlyContinue) {
+            & "dumpbin.exe" /dependents $exe_path
+          } else {
+            Write-Host "dumpbin不可用，跳过依赖检查"
           }
-
-          # 备用方法：手动复制常见的运行时DLL
-          $common_dlls = @(
-            "vcruntime140.dll",
-            "msvcp140.dll",
-            "vcruntime140_1.dll",
-            "msvcp140_1.dll",
-            "msvcp140_2.dll",
-            "concrt140.dll"
-          )
-
-          foreach ($dll in $common_dlls) {
-            foreach ($path in $system_paths) {
-              $dll_path = Join-Path $path $dll
-              if (Test-Path $dll_path) {
-                Write-Host "复制常见运行时DLL: $dll"
-                Copy-Item $dll_path $dist_dir -ErrorAction SilentlyContinue
-                break
-              }
-            }
-          }
-
-      - name: List distribution contents
-        shell: bash
-        run: |
-          program_name=${{ env.program_name }}
-          echo "分发目录内容:"
-          ls -la dist/${program_name}_windows_x64/
 
       - name: Upload Artifacts
         uses: actions/upload-artifact@v4
         with:
           name: ${{ env.program_name }}_windows_x64
-          path: dist/${{ env.program_name }}_windows_x64/
+          path: target/x86_64-pc-windows-msvc/release/${{ env.program_name }}.exe
