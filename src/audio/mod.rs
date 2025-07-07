@@ -4,6 +4,7 @@ use crate::{
     utils::{border::BorderOverlay, file::generate_safe_filename},
 };
 use log::{debug, error, info};
+use tokio;
 mod encode;
 use encode::encode;
 use std::{
@@ -72,7 +73,7 @@ impl AudioRecorder {
             channels.into(),
             None,
         );
-        let blockalign = desired_format.get_blockalign();
+        let block_align = desired_format.get_blockalign();
 
         let (_def_time, min_time) = audio_client.get_device_period()?;
         let mode = StreamMode::EventsShared {
@@ -86,7 +87,7 @@ impl AudioRecorder {
         let render_client = audio_client.get_audiocaptureclient()?;
 
         let mut sample_queue: VecDeque<u8> = VecDeque::with_capacity(
-            100 * blockalign as usize * (1024 + 2 * buffer_frame_count as usize),
+            100 * block_align as usize * (1024 + 2 * buffer_frame_count as usize),
         );
 
         audio_client.start_stream()?;
@@ -168,7 +169,7 @@ impl AudioRecorder {
         }
 
         // 等待录音线程真正退出
-        thread::sleep(std::time::Duration::from_millis(100));
+        tokio::time::sleep(std::time::Duration::from_millis(100)).await;
 
         // 获取并处理音频数据
         let mut data = {
@@ -191,9 +192,9 @@ impl AudioRecorder {
             self.cfg.sample_rate,
             self.channels,
         )?;
-        let fname = generate_safe_filename(&self.cfg.field_name, &self.cfg.format.to_string());
-        self.save_to_anki(raw, &fname).await?;
-        info!("Recording saved as: {fname}");
+        let file_name = generate_safe_filename(&self.cfg.field_name, &self.cfg.format.to_string());
+        self.save_to_anki(raw, &file_name).await?;
+        info!("Recording saved as: {file_name}");
         Ok(())
     }
 

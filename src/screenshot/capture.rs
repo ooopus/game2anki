@@ -7,7 +7,10 @@ use windows_capture::{
     capture::{Context, GraphicsCaptureApiHandler},
     frame::Frame,
     graphics_capture_api::InternalCaptureControl,
-    settings::{ColorFormat, CursorCaptureSettings, DrawBorderSettings, Settings},
+    settings::{
+        ColorFormat, CursorCaptureSettings, DirtyRegionSettings, DrawBorderSettings,
+        MinimumUpdateIntervalSettings, SecondaryWindowSettings, Settings,
+    },
     window::Window,
 };
 struct Flags {
@@ -66,7 +69,7 @@ pub fn capture_active_window(cfg: Screenshot) -> Result<DynamicImage> {
     }
 
     // 获取当前焦点窗口
-    let focus_window = Window::foreground().unwrap();
+    let focus_window = Window::foreground()?;
     debug!("当前焦点窗口: {focus_window:?}");
 
     // 配置截屏设置
@@ -74,6 +77,9 @@ pub fn capture_active_window(cfg: Screenshot) -> Result<DynamicImage> {
         focus_window,
         CursorCaptureSettings::WithoutCursor,
         DrawBorderSettings::Default,
+        SecondaryWindowSettings::Default,
+        MinimumUpdateIntervalSettings::Default,
+        DirtyRegionSettings::Default,
         ColorFormat::Rgba8,
         Arc::clone(&flags),
     );

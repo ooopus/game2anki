@@ -76,7 +76,7 @@ pub fn encode_to_ogg_opus(samples: &[f32], sample_rate: u32, channels: u16) -> R
 
     // PCM to Opus
     let frame_size = 960; // 20ms at 48kHz
-    let mut absgp = 0u64;
+    let mut abs_gp = 0u64;
     for chunk in samples.chunks(frame_size * channels as usize) {
         let mut output = vec![0u8; 4000];
         let mut padded = Vec::from(chunk);
@@ -86,12 +86,12 @@ pub fn encode_to_ogg_opus(samples: &[f32], sample_rate: u32, channels: u16) -> R
 
         match encoder.encode_float(&padded, &mut output) {
             Ok(encoded_size) => {
-                absgp += frame_size as u64;
+                abs_gp += frame_size as u64;
                 writer.write_packet(
                     output[..encoded_size].to_vec(),
                     1,
                     PacketWriteEndInfo::EndPage,
-                    absgp,
+                    abs_gp,
                 )?;
             }
             Err(e) => {

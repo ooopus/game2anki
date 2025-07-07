@@ -18,11 +18,11 @@ async fn main() -> Result<()> {
 
     // 初始化日志系统
     let log_level: log::Level = cfg.log_level.clone().into();
-    simple_logger::init_with_level(log_level).unwrap();
+    simple_logger::init_with_level(log_level)?;
 
     let anki = Arc::new(AnkiClient::new(&cfg.anki));
 
-    hotkey_manager::HotKeyManager::init();
+    HotKeyManager::init();
     setup_screenshot_hotkey(cfg.clone(), anki.clone());
     setup_audio_record_hotkey(cfg.clone(), anki.clone());
 

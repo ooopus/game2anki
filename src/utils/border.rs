@@ -56,8 +56,7 @@ impl BorderOverlay {
     fn window_thread_main(tx: mpsc::Sender<EventLoopProxy<UserEvent>>) -> Result<()> {
         let event_loop = EventLoop::with_user_event()
             .with_any_thread(true)
-            .build()
-            .unwrap();
+            .build()?;
         let proxy = event_loop.create_proxy();
         let mut state = State::default();
         // Send signal once the event loop is created
