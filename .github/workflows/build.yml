@@ -12,9 +12,6 @@ env:
 
 jobs:
   build:
-    strategy:
-      matrix:
-        arch: [amd64, arm64]
     runs-on: windows-latest
     steps:
       - name: Checkout code
@@ -31,15 +28,8 @@ jobs:
       - name: Build for target
         shell: bash
         run: |
-          arch=${{ matrix.arch }}
           program_name=${{ env.program_name }}
-
-          # 设置目标架构
-          if [ "$arch" == "amd64" ]; then
-            target=x86_64-pc-windows-msvc
-          elif [ "$arch" == "arm64" ]; then
-            target=aarch64-pc-windows-msvc
-          fi
+          target=x86_64-pc-windows-msvc
 
           echo "构建目标: $target"
           rustup target add $target
@@ -48,37 +38,23 @@ jobs:
       - name: Create distribution directory
         shell: bash
         run: |
-          arch=${{ matrix.arch }}
           program_name=${{ env.program_name }}
-
-          # 设置目标架构
-          if [ "$arch" == "amd64" ]; then
-            target=x86_64-pc-windows-msvc
-          elif [ "$arch" == "arm64" ]; then
-            target=aarch64-pc-windows-msvc
-          fi
+          target=x86_64-pc-windows-msvc
 
           # 创建分发目录
-          mkdir -p dist/$program_name_windows_$arch
+          mkdir -p dist/${program_name}_windows_x64
 
           # 复制主程序
-          cp target/$target/release/$program_name.exe dist/$program_name_windows_$arch/
+          cp target/$target/release/$program_name.exe dist/${program_name}_windows_x64/
 
       - name: Extract DLL dependencies
         shell: powershell
         run: |
-          $arch = "${{ matrix.arch }}"
           $program_name = "${{ env.program_name }}"
-
-          # 设置目标架构
-          if ($arch -eq "amd64") {
-            $target = "x86_64-pc-windows-msvc"
-          } elseif ($arch -eq "arm64") {
-            $target = "aarch64-pc-windows-msvc"
-          }
+          $target = "x86_64-pc-windows-msvc"
 
           $exe_path = "target\$target\release\$program_name.exe"
-          $dist_dir = "dist\${program_name}_windows_$arch"
+          $dist_dir = "dist\${program_name}_windows_x64"
 
           # 使用ldd等效工具查找DLL依赖 (在Windows上使用dumpbin或其他工具)
           # 这里使用PowerShell的方式来获取DLL依赖
@@ -137,13 +113,12 @@ jobs:
       - name: List distribution contents
         shell: bash
         run: |
-          arch=${{ matrix.arch }}
           program_name=${{ env.program_name }}
           echo "分发目录内容:"
-          ls -la dist/${program_name}_windows_$arch/
+          ls -la dist/${program_name}_windows_x64/
 
       - name: Upload Artifacts
         uses: actions/upload-artifact@v4
         with:
-          name: ${{ env.program_name }}_windows_${{ matrix.arch }}
-          path: dist/${{ env.program_name }}_windows_${{ matrix.arch }}/
+          name: ${{ env.program_name }}_windows_x64
+          path: dist/${{ env.program_name }}_windows_x64/
