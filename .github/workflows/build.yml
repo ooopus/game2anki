@@ -25,6 +25,9 @@ jobs:
         with:
           toolchain: stable
 
+      - name: Set up NASM
+        uses: ilammy/setup-nasm@v1
+
       - name: Build for target
         shell: bash
         run: |
