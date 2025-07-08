@@ -35,20 +35,6 @@ jobs:
           rustup target add $target
           cargo build --release --target=$target
 
-      - name: Check dependencies (optional)
-        shell: powershell
-        run: |
-          $program_name = "${{ env.program_name }}"
-          $target = "x86_64-pc-windows-msvc"
-          $exe_path = "target\$target\release\$program_name.exe"
-
-          Write-Host "检查可执行文件依赖:"
-          if (Get-Command "dumpbin.exe" -ErrorAction SilentlyContinue) {
-            & "dumpbin.exe" /dependents $exe_path
-          } else {
-            Write-Host "dumpbin不可用，跳过依赖检查"
-          }
-
       - name: Upload Artifacts
         uses: actions/upload-artifact@v4
         with:
