@@ -18,7 +18,6 @@ impl AnkiScreenshot {
         Self { cfg, anki }
     }
 
-    /// 外部调用的热键处理函数
     pub async fn on_hotkey_clicked(&self) -> Result<()> {
         let filename = generate_safe_filename(&self.cfg.field_name, &self.cfg.format.to_string());
 

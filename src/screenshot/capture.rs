@@ -68,11 +68,9 @@ pub fn capture_active_window(cfg: Screenshot) -> Result<DynamicImage> {
         }
     }
 
-    // 获取当前焦点窗口
     let focus_window = Window::foreground()?;
     debug!("当前焦点窗口: {focus_window:?}");
 
-    // 配置截屏设置
     let settings = Settings::new(
         focus_window,
         CursorCaptureSettings::WithoutCursor,
@@ -86,7 +84,6 @@ pub fn capture_active_window(cfg: Screenshot) -> Result<DynamicImage> {
 
     Handler::start(settings)?;
 
-    // 用条件变量优雅等待图片生成
     let (lock, cvar) = &*pair;
     let guard = lock.lock().unwrap();
     let timeout = std::time::Duration::from_secs(3);
