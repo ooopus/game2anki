@@ -1,4 +1,4 @@
-//! Window management utilities
+// src/utils/window.rs
 
 use windows_capture::window::Window;
 

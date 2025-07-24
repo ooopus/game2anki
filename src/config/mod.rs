@@ -1,3 +1,4 @@
+// src/config/mod.rs
 use anyhow::{Context, Result};
 use std::fs;
 use std::path::PathBuf;

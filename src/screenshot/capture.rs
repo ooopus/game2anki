@@ -1,3 +1,4 @@
+//capture.rs
 use crate::config::Screenshot;
 use anyhow::{Result, anyhow};
 use image::DynamicImage;

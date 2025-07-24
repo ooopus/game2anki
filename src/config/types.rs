@@ -1,31 +1,116 @@
+// src/config/types.rs
+
 use crate::utils::keyboard::keys_from_str_de;
 use rdev::Key;
 use serde::{Deserialize, Serialize};
 use std::fmt;
+
+// --- 通用媒体配置特性 ---
+pub trait MediaConfig {
+    type Format: fmt::Display;
+    fn field_name(&self) -> &str;
+    fn format(&self) -> &Self::Format;
+}
+
+// --- 截图格式的具体编码配置 ---
+
+#[derive(Clone, Debug, Deserialize, Serialize)]
+pub struct AvifEncodeConfig {
+    pub crf: u8, // CRF ↓ → 质量 ↑ → 文件体积 ↑
+    #[serde(rename = "cpuUsed")]
+    pub cpu_used: u8, // -cpu-used ↓ → 编码速度 ↓ → 压缩效率 ↑（输出更小、质量更高）
+    pub encoder: String,
+}
+
+impl Default for AvifEncodeConfig {
+    fn default() -> Self {
+        Self {
+            crf: 46,
+            cpu_used: 4,
+            encoder: "libaom-av1".to_string(),
+        }
+    }
+}
+
+#[derive(Clone, Debug, Deserialize, Serialize)]
+pub struct WebpEncodeConfig {
+    pub quality: u8,
+}
+
+impl Default for WebpEncodeConfig {
+    fn default() -> Self {
+        Self { quality: 30 }
+    }
+}
+
+#[derive(Clone, Debug, Deserialize, Serialize)]
+pub struct PngEncodeConfig {
+    #[serde(rename = "compressionLevel")]
+    pub compression_level: u8,
+}
+
+impl Default for PngEncodeConfig {
+    fn default() -> Self {
+        Self {
+            compression_level: 6,
+        }
+    }
+}
+
+#[derive(Clone, Debug, Deserialize, Serialize)]
+pub struct OpusEncodeConfig {
+    #[serde(rename = "sampleRate")]
+    pub sample_rate: u32,
+    #[serde(rename = "bitRate")]
+    pub bit_rate: u32,
+}
+
+impl Default for OpusEncodeConfig {
+    fn default() -> Self {
+        Self {
+            sample_rate: 48000,
+            bit_rate: 32,
+        }
+    }
+}
+
+#[derive(Clone, Debug, Deserialize, Serialize)]
+pub struct Mp3EncodeConfig {
+    #[serde(rename = "sampleRate")]
+    pub sample_rate: u32,
+    #[serde(rename = "bitRate")]
+    pub bit_rate: u32,
+    pub quality: u8,
+}
+
+impl Default for Mp3EncodeConfig {
+    fn default() -> Self {
+        Self {
+            sample_rate: 48000,
+            bit_rate: 64,
+            quality: 2,
+        }
+    }
+}
+
+// --- 主配置结构体 ---
+
 #[derive(Debug, Deserialize, Serialize, Default)]
+#[serde(rename_all = "camelCase")]
 pub struct Config {
-    #[serde(rename = "hotKey")]
     pub hot_key: HotKey,
-
-    #[serde(rename = "screenShot")]
     pub screen_shot: Screenshot,
-
-    #[serde(rename = "audioRecord")]
     pub audio_record: AudioRecord,
-
-    #[serde(rename = "anki")]
     pub anki: Anki,
-
-    #[serde(rename = "logLevel")]
     pub log_level: LogLevel,
 }
 
 #[derive(Debug, Deserialize, Serialize)]
+#[serde(rename_all = "camelCase")]
 pub struct HotKey {
-    #[serde(rename = "screenShot", deserialize_with = "keys_from_str_de")]
+    #[serde(deserialize_with = "keys_from_str_de")]
     pub screen_shot: Vec<Key>,
-
-    #[serde(rename = "audioRecord", deserialize_with = "keys_from_str_de")]
+    #[serde(deserialize_with = "keys_from_str_de")]
     pub audio_record: Vec<Key>,
 }
 
@@ -38,61 +123,75 @@ impl Default for HotKey {
     }
 }
 
+// ---截图配置结构 ---
 #[derive(Clone, Debug, Deserialize, Serialize)]
+#[serde(rename_all = "camelCase")]
 pub struct Screenshot {
-    #[serde(rename = "format")]
-    pub format: ScreenshotFormat,
-
-    #[serde(rename = "fieldName")]
     pub field_name: String,
-
-    #[serde(rename = "quality")]
-    pub quality: u8,
-
-    #[serde(rename = "speed")]
-    pub speed: u8,
-
-    #[serde(rename = "excludeTitleBar")]
+    pub format: ScreenshotFormat,
     pub exclude_title_bar: bool,
+    pub avif: AvifEncodeConfig,
+    pub webp: WebpEncodeConfig,
+    pub png: PngEncodeConfig,
 }
 
 impl Default for Screenshot {
     fn default() -> Self {
         Self {
-            format: ScreenshotFormat::Avif,
             field_name: "Picture".to_string(),
-            quality: 60,
-            speed: 6,
+            format: ScreenshotFormat::Avif,
             exclude_title_bar: true,
+            avif: AvifEncodeConfig::default(),
+            webp: WebpEncodeConfig::default(),
+            png: PngEncodeConfig::default(),
         }
     }
 }
 
+impl MediaConfig for Screenshot {
+    type Format = ScreenshotFormat;
+    fn field_name(&self) -> &str {
+        &self.field_name
+    }
+    fn format(&self) -> &Self::Format {
+        &self.format
+    }
+}
+
+// ---录音配置结构 ---
 #[derive(Clone, Debug, Deserialize, Serialize)]
+#[serde(rename_all = "camelCase")]
 pub struct AudioRecord {
-    #[serde(rename = "format")]
-    pub format: AudioFormat,
-
-    #[serde(rename = "fieldName")]
     pub field_name: String,
-
-    #[serde(rename = "sampleRate")]
-    pub sample_rate: u32,
+    pub format: AudioFormat,
+    pub opus: OpusEncodeConfig,
+    pub mp3: Mp3EncodeConfig,
 }
 
 impl Default for AudioRecord {
     fn default() -> Self {
         Self {
-            format: AudioFormat::Opus,
             field_name: "SentenceAudio".to_string(),
-            sample_rate: 48000,
+            format: AudioFormat::Opus,
+            opus: OpusEncodeConfig::default(),
+            mp3: Mp3EncodeConfig::default(),
         }
     }
 }
 
+impl MediaConfig for AudioRecord {
+    type Format = AudioFormat;
+    fn field_name(&self) -> &str {
+        &self.field_name
+    }
+    fn format(&self) -> &Self::Format {
+        &self.format
+    }
+}
+
 #[derive(Debug, Deserialize, Serialize)]
+#[serde(rename_all = "camelCase")]
 pub struct Anki {
-    #[serde(rename = "ankiConnectUrl")]
     pub anki_connect_url: String,
 }
 
@@ -104,28 +203,21 @@ impl Default for Anki {
     }
 }
 
-#[derive(Clone, Debug, Deserialize, Serialize)]
+// --- 枚举 ---
+
+#[derive(Clone, Debug, Deserialize, Serialize, PartialEq, Eq)]
+#[serde(rename_all = "lowercase")]
 pub enum AudioFormat {
-    #[serde(rename = "opus")]
-    Opus, // ogg Opus
-    #[serde(rename = "mp3")]
+    Opus,
     Mp3,
 }
 
-#[derive(Clone, Debug, Deserialize, Serialize)]
+#[derive(Clone, Debug, Deserialize, Serialize, PartialEq, Eq)]
+#[serde(rename_all = "lowercase")]
 pub enum ScreenshotFormat {
-    #[serde(rename = "avif")]
     Avif,
-    #[serde(rename = "webp")]
     Webp,
-    #[serde(rename = "png")]
     Png,
-}
-
-#[derive(Clone, Debug, Deserialize, Serialize)]
-pub enum FileFormat {
-    AudioFormat(AudioFormat),
-    ScreenshotFormat(ScreenshotFormat),
 }
 
 impl fmt::Display for AudioFormat {
@@ -147,35 +239,27 @@ impl fmt::Display for ScreenshotFormat {
     }
 }
 
-#[derive(Clone, Debug, Deserialize, Serialize)]
+#[derive(Clone, Debug, Deserialize, Serialize, Default)]
+#[serde(rename_all = "PascalCase")]
 pub enum LogLevel {
-    #[serde(rename = "trace")]
     Trace,
-    #[serde(rename = "debug")]
     Debug,
-    #[serde(rename = "info")]
+    #[default]
     Info,
-    #[serde(rename = "warn")]
     Warn,
-    #[serde(rename = "error")]
     Error,
-}
-
-impl Default for LogLevel {
-    fn default() -> Self {
-        Self::Info
-    }
 }
 
 impl fmt::Display for LogLevel {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        match self {
-            LogLevel::Trace => write!(f, "trace"),
-            LogLevel::Debug => write!(f, "debug"),
-            LogLevel::Info => write!(f, "info"),
-            LogLevel::Warn => write!(f, "warn"),
-            LogLevel::Error => write!(f, "error"),
-        }
+        let level_str = match self {
+            LogLevel::Trace => "trace",
+            LogLevel::Debug => "debug",
+            LogLevel::Info => "info",
+            LogLevel::Warn => "warn",
+            LogLevel::Error => "error",
+        };
+        write!(f, "{}", level_str)
     }
 }
 
