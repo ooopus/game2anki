@@ -144,7 +144,7 @@ fn create_input(input_cursor: Arc<Mutex<Cursor<Vec<u8>>>>, width: u32, height: u
         .set_format("rawvideo")
         .set_video_codec("rawvideo")
         .set_input_opt("pixel_format", "rgba")
-        .set_input_opt("video_size", &format!("{}x{}", width, height))
+        .set_input_opt("video_size", format!("{width}x{height}"))
         .set_input_opt("framerate", "2") // 设置帧率为 2，因为我们发送两帧
 }
 

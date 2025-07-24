@@ -4,7 +4,6 @@ use crate::{
     utils::{border::BorderOverlay, file::generate_safe_filename},
 };
 use log::{debug, error, info};
-use tokio;
 mod encode;
 use encode::encode;
 use std::{
